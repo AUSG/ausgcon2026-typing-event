@@ -37,6 +37,23 @@ function PromptCharacters({ prompt, typed }: { prompt: string; typed: string }) 
   );
 }
 
+function TypedCharacters({ prompt, typed }: { prompt: string; typed: string }) {
+  if (!typed) {
+    return <span className="typed-placeholder">여기에 입력한 내용이 실시간으로 표시됩니다.</span>;
+  }
+
+  return (
+    <span className="typed-characters">
+      {Array.from(typed).map((character, index) => (
+        <span className={character === prompt[index] ? "typed-correct" : "typed-wrong"} key={`${index}-${character}`}>
+          {character}
+        </span>
+      ))}
+      <i className="typed-caret" aria-hidden="true" />
+    </span>
+  );
+}
+
 function Leaderboard({
   entries,
   loading,
@@ -348,24 +365,30 @@ export function TypingGame() {
                 <div><span>SPEED</span><strong>{liveCpm}<small> CPM</small></strong></div>
                 <div><span>PROGRESS</span><strong>{Math.floor(progress)}<small>%</small></strong></div>
               </div>
-              <div className="prompt-wrap">
-                <span className="prompt-label"><i /> TARGET STRING</span>
-                <PromptCharacters prompt={prompt} typed={typed} />
-                <textarea
-                  aria-label="제시된 문장을 입력하세요"
-                  autoCapitalize="off"
-                  autoComplete="off"
-                  autoCorrect="off"
-                  autoFocus
-                  disabled={phase === "saving"}
-                  onChange={handleTyping}
-                  onBlur={() => window.setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 0)}
-                  onKeyDown={handleTypingKeyDown}
-                  onPaste={(event) => event.preventDefault()}
-                  ref={inputRef}
-                  spellCheck={false}
-                  value={typed}
-                />
+              <div className="typing-stage">
+                <div className="sentence-box sentence-box--target">
+                  <span className="prompt-label">제시 문장</span>
+                  <PromptCharacters prompt={prompt} typed={typed} />
+                </div>
+                <div className="sentence-box sentence-box--input">
+                  <span className="prompt-label">내 입력</span>
+                  <div className="typed-line"><TypedCharacters prompt={prompt} typed={typed} /></div>
+                  <textarea
+                    aria-label="제시된 문장을 입력하세요"
+                    autoCapitalize="off"
+                    autoComplete="off"
+                    autoCorrect="off"
+                    autoFocus
+                    disabled={phase === "saving"}
+                    onChange={handleTyping}
+                    onBlur={() => window.setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 0)}
+                    onKeyDown={handleTypingKeyDown}
+                    onPaste={(event) => event.preventDefault()}
+                    ref={inputRef}
+                    spellCheck={false}
+                    value={typed}
+                  />
+                </div>
               </div>
               <div className="progress-line"><span style={{ width: `${progress}%` }} /></div>
               <div className="typing-footer">
