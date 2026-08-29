@@ -188,6 +188,12 @@ export function TypingGame() {
     [attemptId, fetchLeaderboard],
   );
 
+  useEffect(() => {
+    if (phase === "typing" && prompt.length > 0 && typed === prompt) {
+      void submitResult(typed);
+    }
+  }, [phase, prompt, submitResult, typed]);
+
   async function startChallenge(event: React.FormEvent) {
     event.preventDefault();
     setError("");
@@ -231,7 +237,16 @@ export function TypingGame() {
     const value = event.target.value.slice(0, prompt.length);
     setTyped(value);
     setError("");
-    if (value === prompt) void submitResult(value);
+  }
+
+  function handleTypingKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    if (typed === prompt) {
+      void submitResult(typed);
+    } else {
+      setError("문장을 끝까지 정확하게 입력하면 자동으로 완료돼요.");
+    }
   }
 
   return (
@@ -245,21 +260,19 @@ export function TypingGame() {
         <div className="event-date"><i /> 2026. 09. 05</div>
       </header>
 
-      <div className="decor-cloud decor-cloud--one" aria-hidden="true" />
-      <div className="decor-cloud decor-cloud--two" aria-hidden="true" />
-      <div className="decor-orbit" aria-hidden="true"><span>TYPE</span><span>SHIP</span><span>LEARN</span></div>
-
       <section className="hero-copy">
-        <span className="eyebrow">DIVE INTO TECH, TYPE INTO FUTURE</span>
-        <h1>TYPE INTO<br /><em>THE FUTURE</em></h1>
-        <p>한 번의 도전, 가장 빠른 손끝.<br />개발 문장을 정확하게 입력하고 오늘의 기록을 완성하세요.</p>
+        <div>
+          <span className="eyebrow">AUSGCON 2026 · SIDE QUEST</span>
+          <h1>TYPE <em>RUSH</em></h1>
+        </div>
+        <p><b>MISSION 01</b> 개발 문장을 정확하게 입력하고<br />오늘의 최고 속도를 차지하세요.</p>
       </section>
 
       <div className="content-grid">
         <section className="game-card" aria-live="polite">
           <div className="card-topline">
-            <span>CHALLENGE_01</span>
-            <span className="chance"><i /> ONE PERSON · ONE CHANCE</span>
+            <span>⌁ SPEED TERMINAL / 01</span>
+            <span className="chance"><i /> SYSTEM ONLINE</span>
           </div>
 
           {storageMode === "memory" && (
@@ -268,10 +281,10 @@ export function TypingGame() {
 
           {phase === "ready" && (
             <div className="ready-panel">
-              <div className="terminal-icon" aria-hidden="true"><span>&gt;_</span></div>
-              <span className="step-label">READY TO CHALLENGE?</span>
-              <h2>당신의 닉네임을<br />입력해주세요.</h2>
-              <p>시작 버튼을 누르는 순간 도전권이 사용됩니다.<br />영문 대·소문자와 기호까지 정확하게 입력하세요.</p>
+              <div className="terminal-icon" aria-hidden="true"><span>▶</span></div>
+              <span className="step-label">PLAYER ENTRY</span>
+              <h2>도전자 등록</h2>
+              <p>닉네임을 입력하고 스피드 런을 시작하세요.<br />대·소문자와 기호까지 정확히 입력해야 합니다.</p>
               <form onSubmit={startChallenge}>
                 <label htmlFor="nickname">PLAYER NAME</label>
                 <div className="nickname-control">
@@ -284,7 +297,7 @@ export function TypingGame() {
                     placeholder="닉네임 2~16자"
                     value={nickname}
                   />
-                  <button type="submit">START <span>↗</span></button>
+                  <button type="submit">GAME START <span>→</span></button>
                 </div>
                 {error && <div className="error-message" role="alert">{error}</div>}
               </form>
@@ -304,10 +317,11 @@ export function TypingGame() {
               <div className="metrics">
                 <div><span>TIME</span><strong>{formatTime(elapsed)}</strong></div>
                 <div><span>ACCURACY</span><strong>{accuracy.toFixed(1)}<small>%</small></strong></div>
-                <div><span>LIVE CPM</span><strong>{liveCpm}</strong></div>
+                <div><span>SPEED</span><strong>{liveCpm}<small> CPM</small></strong></div>
+                <div><span>PROGRESS</span><strong>{Math.floor(progress)}<small>%</small></strong></div>
               </div>
               <div className="prompt-wrap">
-                <span className="prompt-label">TYPE THE FOLLOWING</span>
+                <span className="prompt-label"><i /> TARGET STRING</span>
                 <PromptCharacters prompt={prompt} typed={typed} />
                 <textarea
                   aria-label="제시된 문장을 입력하세요"
@@ -316,6 +330,7 @@ export function TypingGame() {
                   autoCorrect="off"
                   disabled={phase === "saving"}
                   onChange={handleTyping}
+                  onKeyDown={handleTypingKeyDown}
                   onPaste={(event) => event.preventDefault()}
                   ref={inputRef}
                   spellCheck={false}
@@ -325,7 +340,7 @@ export function TypingGame() {
               <div className="progress-line"><span style={{ width: `${progress}%` }} /></div>
               <div className="typing-footer">
                 <span>{typed.length} / {prompt.length} CHARACTERS</span>
-                <span>{phase === "saving" ? "SAVING RESULT..." : "KEEP GOING →"}</span>
+                <span>{phase === "saving" ? "UPLOADING SCORE..." : "완성 시 자동 종료 · ENTER로 확인"}</span>
               </div>
               {error && <div className="error-message" role="alert">{error}</div>}
             </div>

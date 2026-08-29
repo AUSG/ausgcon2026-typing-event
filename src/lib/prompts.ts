@@ -93,7 +93,9 @@ export const PROMPTS: TypingPrompt[] = [
 ];
 
 export function promptText(prompt: TypingPrompt) {
-  return prompt.lines.join("\n");
+  // Lines are a content-authoring aid. Players should never have to guess where
+  // an invisible newline belongs, so the playable prompt is one continuous line.
+  return prompt.lines.join(" ");
 }
 
 export function getRandomPrompt() {
@@ -103,4 +105,3 @@ export function getRandomPrompt() {
 export function getPrompt(id: number) {
   return PROMPTS.find((prompt) => prompt.id === id);
 }
-
