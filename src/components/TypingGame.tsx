@@ -86,6 +86,7 @@ function Leaderboard({
 }
 
 export function TypingGame() {
+  const [view, setView] = useState<"game" | "ranking">("game");
   const [phase, setPhase] = useState<Phase>("ready");
   const [nickname, setNickname] = useState("");
   const [attemptId, setAttemptId] = useState("");
@@ -145,10 +146,26 @@ export function TypingGame() {
 
   useEffect(() => {
     if (phase !== "typing") return;
+    const focusInput = () => inputRef.current?.focus({ preventScroll: true });
+    const recoverFocus = (event: KeyboardEvent) => {
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      if (document.activeElement !== inputRef.current) focusInput();
+    };
+    focusInput();
+    const firstFocus = window.setTimeout(focusInput, 50);
+    const secondFocus = window.setTimeout(focusInput, 200);
+    window.addEventListener("keydown", recoverFocus, true);
+    window.addEventListener("focus", focusInput);
     const timer = window.setInterval(() => {
       setElapsed(performance.now() - startedAtRef.current);
     }, 50);
-    return () => window.clearInterval(timer);
+    return () => {
+      window.clearTimeout(firstFocus);
+      window.clearTimeout(secondFocus);
+      window.clearInterval(timer);
+      window.removeEventListener("keydown", recoverFocus, true);
+      window.removeEventListener("focus", focusInput);
+    };
   }, [phase]);
 
   const correctCount = useMemo(
@@ -268,7 +285,18 @@ export function TypingGame() {
         <p><b>MISSION 01</b> 개발 문장을 정확하게 입력하고<br />오늘의 최고 속도를 차지하세요.</p>
       </section>
 
+      <nav className="mode-tabs" aria-label="화면 선택">
+        <button className={view === "game" ? "is-active" : ""} onClick={() => setView("game")} type="button">▶ 게임 시작</button>
+        <button
+          className={view === "ranking" ? "is-active" : ""}
+          disabled={phase === "countdown" || phase === "typing" || phase === "saving"}
+          onClick={() => setView("ranking")}
+          type="button"
+        >★ 순위 보기</button>
+      </nav>
+
       <div className="content-grid">
+        {view === "game" ? (
         <section className="game-card" aria-live="polite">
           <div className="card-topline">
             <span>⌁ SPEED TERMINAL / 01</span>
@@ -328,8 +356,10 @@ export function TypingGame() {
                   autoCapitalize="off"
                   autoComplete="off"
                   autoCorrect="off"
+                  autoFocus
                   disabled={phase === "saving"}
                   onChange={handleTyping}
+                  onBlur={() => window.setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 0)}
                   onKeyDown={handleTypingKeyDown}
                   onPaste={(event) => event.preventDefault()}
                   ref={inputRef}
@@ -354,17 +384,19 @@ export function TypingGame() {
                 <div><span>ACCURACY</span><strong>{result.accuracy.toFixed(1)}%</strong></div>
                 <div><span>TIME</span><strong>{formatTime(result.durationMs)}</strong></div>
               </div>
-              <p>기록이 저장되었습니다. 오른쪽 실시간 순위에서 확인해보세요.</p>
+              <p>기록이 저장되었습니다. 순위 보기에서 오늘의 랭킹을 확인해보세요.</p>
               <div className="result-rule">한 사람당 도전은 한 번만 가능합니다.</div>
+              <button className="ranking-button" onClick={() => setView("ranking")} type="button">내 순위 확인하기 →</button>
             </div>
           )}
         </section>
-
+        ) : (
         <Leaderboard
           entries={leaderboard}
           highlight={result?.nickname}
           loading={rankingLoading}
         />
+        )}
       </div>
 
       <footer className="footer-note">
