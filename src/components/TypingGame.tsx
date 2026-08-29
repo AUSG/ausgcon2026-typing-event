@@ -283,6 +283,20 @@ export function TypingGame() {
     }
   }
 
+  function startNewPlayer() {
+    setView("game");
+    setPhase("ready");
+    setNickname("");
+    setAttemptId("");
+    setPrompt("");
+    setTyped("");
+    setElapsed(0);
+    setCountdown(COUNTDOWN_SECONDS);
+    setError("");
+    setResult(null);
+    submittedRef.current = false;
+  }
+
   return (
     <main className="event-shell">
       <header className="topbar">
@@ -303,7 +317,11 @@ export function TypingGame() {
       </section>
 
       <nav className="mode-tabs" aria-label="화면 선택">
-        <button className={view === "game" ? "is-active" : ""} onClick={() => setView("game")} type="button">▶ 게임 시작</button>
+        <button
+          className={view === "game" ? "is-active" : ""}
+          onClick={() => phase === "result" ? startNewPlayer() : setView("game")}
+          type="button"
+        >▶ 게임 시작</button>
         <button
           className={view === "ranking" ? "is-active" : ""}
           disabled={phase === "countdown" || phase === "typing" || phase === "saving"}
@@ -408,8 +426,11 @@ export function TypingGame() {
                 <div><span>TIME</span><strong>{formatTime(result.durationMs)}</strong></div>
               </div>
               <p>기록이 저장되었습니다. 순위 보기에서 오늘의 랭킹을 확인해보세요.</p>
-              <div className="result-rule">한 사람당 도전은 한 번만 가능합니다.</div>
-              <button className="ranking-button" onClick={() => setView("ranking")} type="button">내 순위 확인하기 →</button>
+              <div className="result-rule">닉네임당 도전은 한 번만 가능합니다.</div>
+              <div className="result-actions">
+                <button className="new-player-button" onClick={startNewPlayer} type="button">새 플레이어 시작</button>
+                <button className="ranking-button" onClick={() => setView("ranking")} type="button">내 순위 확인하기 →</button>
+              </div>
             </div>
           )}
         </section>
