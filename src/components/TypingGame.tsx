@@ -13,12 +13,14 @@ function formatTime(milliseconds: number) {
   return `${(milliseconds / 1000).toFixed(1)}s`;
 }
 
-function PromptCharacters({ prompt, typed }: { prompt: string; typed: string }) {
+function PromptCharacters({ prompt, typed, composing = false }: { prompt: string; typed: string; composing?: boolean }) {
   return (
     <div className="prompt-text" aria-hidden="true">
       {Array.from(prompt).map((character, index) => {
         const typedCharacter = typed[index];
-        const className =
+        const className = composing && index === typed.length - 1
+          ? "prompt-char prompt-char--composing"
+          :
           typedCharacter === undefined
             ? index === typed.length
               ? "prompt-char prompt-char--cursor"
@@ -34,23 +36,6 @@ function PromptCharacters({ prompt, typed }: { prompt: string; typed: string }) 
         );
       })}
     </div>
-  );
-}
-
-function TypedCharacters({ prompt, typed }: { prompt: string; typed: string }) {
-  if (!typed) {
-    return <span className="typed-placeholder">여기에 입력한 내용이 실시간으로 표시됩니다.</span>;
-  }
-
-  return (
-    <span className="typed-characters">
-      {Array.from(typed).map((character, index) => (
-        <span className={character === prompt[index] ? "typed-correct" : "typed-wrong"} key={`${index}-${character}`}>
-          {character}
-        </span>
-      ))}
-      <i className="typed-caret" aria-hidden="true" />
-    </span>
   );
 }
 
@@ -115,10 +100,19 @@ export function TypingGame() {
   const [result, setResult] = useState<Result | null>(null);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [rankingLoading, setRankingLoading] = useState(true);
+  const [isStarting, setIsStarting] = useState(false);
+  const [mistakeCount, setMistakeCount] = useState(0);
+  const [committedCount, setCommittedCount] = useState(0);
+  const [hasInputFocus, setHasInputFocus] = useState(false);
+  const [inputNudge, setInputNudge] = useState(false);
+  const [isComposing, setIsComposing] = useState(false);
   const [storageMode, setStorageMode] = useState<"supabase" | "memory" | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const startedAtRef = useRef(0);
   const submittedRef = useRef(false);
+  const composingRef = useRef(false);
+  const compositionBaseRef = useRef(0);
+  const compositionValueRef = useRef("");
 
   const fetchLeaderboard = useCallback(async () => {
     try {
@@ -138,13 +132,14 @@ export function TypingGame() {
   }, []);
 
   useEffect(() => {
+    if (view !== "ranking") return;
     const initialTimer = window.setTimeout(() => void fetchLeaderboard(), 0);
     const timer = window.setInterval(() => void fetchLeaderboard(), 5_000);
     return () => {
       window.clearTimeout(initialTimer);
       window.clearInterval(timer);
     };
-  }, [fetchLeaderboard]);
+  }, [fetchLeaderboard, view]);
 
   useEffect(() => {
     if (phase !== "countdown") return;
@@ -157,7 +152,7 @@ export function TypingGame() {
       } else {
         setCountdown((value) => value - 1);
       }
-    }, 760);
+    }, 1_000);
     return () => window.clearTimeout(timer);
   }, [countdown, phase]);
 
@@ -189,7 +184,7 @@ export function TypingGame() {
     () => Array.from(typed).reduce((count, char, index) => count + (char === prompt[index] ? 1 : 0), 0),
     [prompt, typed],
   );
-  const accuracy = typed.length === 0 ? 100 : Math.round((correctCount / typed.length) * 1000) / 10;
+  const accuracy = committedCount === 0 ? 100 : Math.round(((committedCount - mistakeCount) / committedCount) * 1000) / 10;
   const liveCpm = elapsed > 0 ? Math.round(correctCount / (elapsed / 60_000)) : 0;
   const progress = prompt.length > 0 ? Math.min((typed.length / prompt.length) * 100, 100) : 0;
 
@@ -205,7 +200,7 @@ export function TypingGame() {
         const response = await fetch("/api/attempt", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ attemptId, typedText: finalText, durationMs }),
+          body: JSON.stringify({ attemptId, typedText: finalText, durationMs, mistakeCount }),
         });
         const data = (await response.json()) as Result & { message?: string };
         if (!response.ok) throw new Error(data.message || "기록을 저장하지 못했어요.");
@@ -219,23 +214,25 @@ export function TypingGame() {
         window.setTimeout(() => inputRef.current?.focus(), 0);
       }
     },
-    [attemptId, fetchLeaderboard],
+    [attemptId, fetchLeaderboard, mistakeCount],
   );
 
   useEffect(() => {
-    if (phase === "typing" && prompt.length > 0 && typed === prompt) {
+    if (phase === "typing" && !isComposing && prompt.length > 0 && typed === prompt) {
       void submitResult(typed);
     }
-  }, [phase, prompt, submitResult, typed]);
+  }, [isComposing, phase, prompt, submitResult, typed]);
 
   async function startChallenge(event: React.FormEvent) {
     event.preventDefault();
+    if (isStarting) return;
     setError("");
     if (Array.from(nickname.trim()).length < 2) {
       setError("닉네임을 2자 이상 입력해주세요.");
       return;
     }
 
+    setIsStarting(true);
     try {
       const response = await fetch("/api/challenge", {
         method: "POST",
@@ -259,31 +256,78 @@ export function TypingGame() {
       setTyped("");
       setElapsed(0);
       setCountdown(COUNTDOWN_SECONDS);
+      setMistakeCount(0);
+      setCommittedCount(0);
       submittedRef.current = false;
       setPhase("countdown");
     } catch (startError) {
       setError(startError instanceof Error ? startError.message : "게임을 시작하지 못했어요.");
+    } finally {
+      setIsStarting(false);
     }
+  }
+
+  function recordCommittedCharacters(value: string, fromIndex: number) {
+    const additions = Array.from(value).slice(fromIndex);
+    if (additions.length === 0) return;
+    const errors = additions.reduce(
+      (count, character, offset) => count + (character === Array.from(prompt)[fromIndex + offset] ? 0 : 1),
+      0,
+    );
+    setCommittedCount((count) => count + additions.length);
+    setMistakeCount((count) => count + errors);
   }
 
   function handleTyping(event: React.ChangeEvent<HTMLTextAreaElement>) {
     if (phase !== "typing") return;
     const value = event.target.value.slice(0, prompt.length);
+    const currentHasError = Array.from(typed).some((character, index) => character !== Array.from(prompt)[index]);
+    if (!composingRef.current && currentHasError && value.length > typed.length) {
+      setInputNudge(true);
+      window.setTimeout(() => setInputNudge(false), 160);
+      return;
+    }
+    if (!composingRef.current && value.length > typed.length) {
+      recordCommittedCharacters(value, Array.from(typed).length);
+    }
     setTyped(value);
     setError("");
   }
 
+  function handleCompositionStart() {
+    composingRef.current = true;
+    setIsComposing(true);
+    compositionBaseRef.current = Array.from(typed).length;
+    compositionValueRef.current = typed;
+  }
+
+  function handleCompositionEnd(event: React.CompositionEvent<HTMLTextAreaElement>) {
+    composingRef.current = false;
+    setIsComposing(false);
+    const value = event.currentTarget.value.slice(0, prompt.length);
+    const previousHasError = Array.from(compositionValueRef.current).some(
+      (character, index) => character !== Array.from(prompt)[index],
+    );
+    if (previousHasError && Array.from(value).length > compositionBaseRef.current) {
+      setTyped(compositionValueRef.current);
+      setInputNudge(true);
+      window.setTimeout(() => setInputNudge(false), 160);
+      return;
+    }
+    recordCommittedCharacters(value, compositionBaseRef.current);
+    setTyped(value);
+  }
+
   function handleTypingKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (event.nativeEvent.isComposing || event.keyCode === 229) return;
     if (event.key !== "Enter") return;
     event.preventDefault();
     if (typed === prompt) {
       void submitResult(typed);
-    } else {
-      setError("문장을 끝까지 정확하게 입력하면 자동으로 완료돼요.");
     }
   }
 
-  function startNewPlayer() {
+  const startNewPlayer = useCallback(() => {
     setView("game");
     setPhase("ready");
     setNickname("");
@@ -294,11 +338,25 @@ export function TypingGame() {
     setCountdown(COUNTDOWN_SECONDS);
     setError("");
     setResult(null);
+    setMistakeCount(0);
+    setCommittedCount(0);
+    setHasInputFocus(false);
+    setIsComposing(false);
+    setIsStarting(false);
     submittedRef.current = false;
-  }
+  }, []);
+
+  useEffect(() => {
+    if (phase !== "result") return;
+    const handleNextPlayer = (event: KeyboardEvent) => {
+      if (event.key === "Enter" && !(event.target instanceof HTMLButtonElement)) startNewPlayer();
+    };
+    window.addEventListener("keydown", handleNextPlayer);
+    return () => window.removeEventListener("keydown", handleNextPlayer);
+  }, [phase, startNewPlayer]);
 
   return (
-    <main className="event-shell">
+    <main className="event-shell" data-phase={phase}>
       <header className="topbar">
         <a className="brand" href="https://2026.ausg.me/" target="_blank" rel="noreferrer">
           <span className="brand-mark">A</span>
@@ -360,7 +418,7 @@ export function TypingGame() {
                     placeholder="닉네임 2~16자"
                     value={nickname}
                   />
-                  <button type="submit">GAME START <span>→</span></button>
+                  <button disabled={isStarting} type="submit">{isStarting ? "준비 중..." : <>GAME START <span>→</span></>}</button>
                 </div>
                 {error && <div className="error-message" role="alert">{error}</div>}
               </form>
@@ -371,7 +429,8 @@ export function TypingGame() {
             <div className="countdown-panel">
               <span className="step-label">GET READY, {nickname.toUpperCase()}</span>
               <strong key={countdown}>{countdown === 0 ? "GO" : countdown}</strong>
-              <p>문장이 나타나면 바로 타이핑하세요.</p>
+              <p className="countdown-guide">문장을 미리 읽고 시작 신호를 기다리세요.</p>
+              <p className="countdown-prompt">{prompt}</p>
             </div>
           )}
 
@@ -380,17 +439,16 @@ export function TypingGame() {
               <div className="metrics">
                 <div><span>TIME</span><strong>{formatTime(elapsed)}</strong></div>
                 <div><span>ACCURACY</span><strong>{accuracy.toFixed(1)}<small>%</small></strong></div>
-                <div><span>SPEED</span><strong>{liveCpm}<small> CPM</small></strong></div>
+                <div><span>SPEED</span><strong>{elapsed >= 1_500 ? liveCpm : "—"}<small> CPM</small></strong></div>
                 <div><span>PROGRESS</span><strong>{Math.floor(progress)}<small>%</small></strong></div>
               </div>
-              <div className="typing-stage">
+              <div className={`typing-stage${inputNudge ? " typing-stage--nudge" : ""}`}>
                 <div className="sentence-box sentence-box--target">
-                  <span className="prompt-label">제시 문장</span>
-                  <PromptCharacters prompt={prompt} typed={typed} />
-                </div>
-                <div className="sentence-box sentence-box--input">
-                  <span className="prompt-label">내 입력</span>
-                  <div className="typed-line"><TypedCharacters prompt={prompt} typed={typed} /></div>
+                  <div className="prompt-heading">
+                    <span className="prompt-label">아래 문장을 입력하세요</span>
+                    <span className={`focus-state${hasInputFocus ? " is-focused" : ""}`}><i /> {hasInputFocus ? "입력 준비됨" : "화면을 클릭하세요"}</span>
+                  </div>
+                  <PromptCharacters composing={isComposing} prompt={prompt} typed={typed} />
                   <textarea
                     aria-label="제시된 문장을 입력하세요"
                     autoCapitalize="off"
@@ -399,7 +457,13 @@ export function TypingGame() {
                     autoFocus
                     disabled={phase === "saving"}
                     onChange={handleTyping}
-                    onBlur={() => window.setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 0)}
+                    onBlur={() => {
+                      setHasInputFocus(false);
+                      window.setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 0);
+                    }}
+                    onCompositionEnd={handleCompositionEnd}
+                    onCompositionStart={handleCompositionStart}
+                    onFocus={() => setHasInputFocus(true)}
                     onKeyDown={handleTypingKeyDown}
                     onPaste={(event) => event.preventDefault()}
                     ref={inputRef}
@@ -407,11 +471,12 @@ export function TypingGame() {
                     value={typed}
                   />
                 </div>
+                {phase === "saving" && <div className="saving-overlay"><span /> 기록 저장 중...</div>}
               </div>
               <div className="progress-line"><span style={{ width: `${progress}%` }} /></div>
               <div className="typing-footer">
                 <span>{typed.length} / {prompt.length} CHARACTERS</span>
-                <span>{phase === "saving" ? "UPLOADING SCORE..." : "완성 시 자동 종료 · ENTER로 확인"}</span>
+                <span>{mistakeCount > 0 ? `오타 ${mistakeCount}회 · BACKSPACE로 수정` : "오타 없이 진행 중"}</span>
               </div>
               {error && <div className="error-message" role="alert">{error}</div>}
             </div>
@@ -424,11 +489,12 @@ export function TypingGame() {
               <div className="result-stats">
                 <div><span>ACCURACY</span><strong>{result.accuracy.toFixed(1)}%</strong></div>
                 <div><span>TIME</span><strong>{formatTime(result.durationMs)}</strong></div>
+                <div><span>MISTAKES</span><strong>{mistakeCount}</strong></div>
               </div>
               <p>기록이 저장되었습니다. 순위 보기에서 오늘의 랭킹을 확인해보세요.</p>
               <div className="result-rule">닉네임당 도전은 한 번만 가능합니다.</div>
               <div className="result-actions">
-                <button className="new-player-button" onClick={startNewPlayer} type="button">새 플레이어 시작</button>
+                <button className="new-player-button" onClick={startNewPlayer} type="button">새 플레이어 시작 <kbd>ENTER</kbd></button>
                 <button className="ranking-button" onClick={() => setView("ranking")} type="button">내 순위 확인하기 →</button>
               </div>
             </div>
