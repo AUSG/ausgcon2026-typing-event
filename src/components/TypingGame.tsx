@@ -29,9 +29,13 @@ function PromptCharacters({ prompt, typed, composing = false }: { prompt: string
               ? "prompt-char prompt-char--correct"
               : "prompt-char prompt-char--wrong";
 
+        const displayCharacter = typedCharacter !== undefined && typedCharacter !== character
+          ? typedCharacter
+          : character;
+
         return (
           <span className={className} key={`${index}-${character}`}>
-            {character === "\n" ? <br /> : character}
+            {displayCharacter === "\n" ? <br /> : displayCharacter}
           </span>
         );
       })}
@@ -101,18 +105,12 @@ export function TypingGame() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [rankingLoading, setRankingLoading] = useState(true);
   const [isStarting, setIsStarting] = useState(false);
-  const [mistakeCount, setMistakeCount] = useState(0);
-  const [committedCount, setCommittedCount] = useState(0);
   const [hasInputFocus, setHasInputFocus] = useState(false);
-  const [inputNudge, setInputNudge] = useState(false);
   const [isComposing, setIsComposing] = useState(false);
   const [storageMode, setStorageMode] = useState<"supabase" | "memory" | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const startedAtRef = useRef(0);
   const submittedRef = useRef(false);
-  const composingRef = useRef(false);
-  const compositionBaseRef = useRef(0);
-  const compositionValueRef = useRef("");
 
   const fetchLeaderboard = useCallback(async () => {
     try {
@@ -184,7 +182,8 @@ export function TypingGame() {
     () => Array.from(typed).reduce((count, char, index) => count + (char === prompt[index] ? 1 : 0), 0),
     [prompt, typed],
   );
-  const accuracy = committedCount === 0 ? 100 : Math.round(((committedCount - mistakeCount) / committedCount) * 1000) / 10;
+  const mistakeCount = typed.length - correctCount;
+  const accuracy = typed.length === 0 ? 100 : Math.round((correctCount / typed.length) * 1000) / 10;
   const liveCpm = elapsed > 0 ? Math.round(correctCount / (elapsed / 60_000)) : 0;
   const progress = prompt.length > 0 ? Math.min((typed.length / prompt.length) * 100, 100) : 0;
 
@@ -200,7 +199,7 @@ export function TypingGame() {
         const response = await fetch("/api/attempt", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ attemptId, typedText: finalText, durationMs, mistakeCount }),
+          body: JSON.stringify({ attemptId, typedText: finalText, durationMs }),
         });
         const data = (await response.json()) as Result & { message?: string };
         if (!response.ok) throw new Error(data.message || "기록을 저장하지 못했어요.");
@@ -214,11 +213,11 @@ export function TypingGame() {
         window.setTimeout(() => inputRef.current?.focus(), 0);
       }
     },
-    [attemptId, fetchLeaderboard, mistakeCount],
+    [attemptId, fetchLeaderboard],
   );
 
   useEffect(() => {
-    if (phase === "typing" && !isComposing && prompt.length > 0 && typed === prompt) {
+    if (phase === "typing" && !isComposing && prompt.length > 0 && typed.length === prompt.length) {
       void submitResult(typed);
     }
   }, [isComposing, phase, prompt, submitResult, typed]);
@@ -256,8 +255,6 @@ export function TypingGame() {
       setTyped("");
       setElapsed(0);
       setCountdown(COUNTDOWN_SECONDS);
-      setMistakeCount(0);
-      setCommittedCount(0);
       submittedRef.current = false;
       setPhase("countdown");
     } catch (startError) {
@@ -267,54 +264,20 @@ export function TypingGame() {
     }
   }
 
-  function recordCommittedCharacters(value: string, fromIndex: number) {
-    const additions = Array.from(value).slice(fromIndex);
-    if (additions.length === 0) return;
-    const errors = additions.reduce(
-      (count, character, offset) => count + (character === Array.from(prompt)[fromIndex + offset] ? 0 : 1),
-      0,
-    );
-    setCommittedCount((count) => count + additions.length);
-    setMistakeCount((count) => count + errors);
-  }
-
   function handleTyping(event: React.ChangeEvent<HTMLTextAreaElement>) {
     if (phase !== "typing") return;
     const value = event.target.value.slice(0, prompt.length);
-    const currentHasError = Array.from(typed).some((character, index) => character !== Array.from(prompt)[index]);
-    if (!composingRef.current && currentHasError && value.length > typed.length) {
-      setInputNudge(true);
-      window.setTimeout(() => setInputNudge(false), 160);
-      return;
-    }
-    if (!composingRef.current && value.length > typed.length) {
-      recordCommittedCharacters(value, Array.from(typed).length);
-    }
     setTyped(value);
     setError("");
   }
 
   function handleCompositionStart() {
-    composingRef.current = true;
     setIsComposing(true);
-    compositionBaseRef.current = Array.from(typed).length;
-    compositionValueRef.current = typed;
   }
 
   function handleCompositionEnd(event: React.CompositionEvent<HTMLTextAreaElement>) {
-    composingRef.current = false;
     setIsComposing(false);
     const value = event.currentTarget.value.slice(0, prompt.length);
-    const previousHasError = Array.from(compositionValueRef.current).some(
-      (character, index) => character !== Array.from(prompt)[index],
-    );
-    if (previousHasError && Array.from(value).length > compositionBaseRef.current) {
-      setTyped(compositionValueRef.current);
-      setInputNudge(true);
-      window.setTimeout(() => setInputNudge(false), 160);
-      return;
-    }
-    recordCommittedCharacters(value, compositionBaseRef.current);
     setTyped(value);
   }
 
@@ -322,7 +285,7 @@ export function TypingGame() {
     if (event.nativeEvent.isComposing || event.keyCode === 229) return;
     if (event.key !== "Enter") return;
     event.preventDefault();
-    if (typed === prompt) {
+    if (typed.length === prompt.length) {
       void submitResult(typed);
     }
   }
@@ -338,8 +301,6 @@ export function TypingGame() {
     setCountdown(COUNTDOWN_SECONDS);
     setError("");
     setResult(null);
-    setMistakeCount(0);
-    setCommittedCount(0);
     setHasInputFocus(false);
     setIsComposing(false);
     setIsStarting(false);
@@ -442,7 +403,7 @@ export function TypingGame() {
                 <div><span>SPEED</span><strong>{elapsed >= 1_500 ? liveCpm : "—"}<small> CPM</small></strong></div>
                 <div><span>PROGRESS</span><strong>{Math.floor(progress)}<small>%</small></strong></div>
               </div>
-              <div className={`typing-stage${inputNudge ? " typing-stage--nudge" : ""}`}>
+              <div className="typing-stage">
                 <div className="sentence-box sentence-box--target">
                   <div className="prompt-heading">
                     <span className="prompt-label">아래 문장을 입력하세요</span>
@@ -476,7 +437,7 @@ export function TypingGame() {
               <div className="progress-line"><span style={{ width: `${progress}%` }} /></div>
               <div className="typing-footer">
                 <span>{typed.length} / {prompt.length} CHARACTERS</span>
-                <span>{mistakeCount > 0 ? `오타 ${mistakeCount}회 · BACKSPACE로 수정` : "오타 없이 진행 중"}</span>
+                <span>{mistakeCount > 0 ? `현재 오타 ${mistakeCount}개 · 수정하지 않으면 점수 감점` : "오타 없이 진행 중"}</span>
               </div>
               {error && <div className="error-message" role="alert">{error}</div>}
             </div>

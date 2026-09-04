@@ -81,8 +81,6 @@ button,a { -webkit-tap-highlight-color: transparent; }
 .metrics strong { font: 500 21px DM Mono,monospace; }
 .metrics small { color: var(--blue); font-size: 10px; }
 .typing-stage { position: relative; }
-.typing-stage--nudge { animation: nudge .16s ease; }
-@keyframes nudge { 35% { transform: translateX(-5px) } 70% { transform: translateX(5px) } }
 .sentence-box { position: relative; min-height: 270px; padding: 26px 30px; border-radius: 20px; }
 .sentence-box--target { color: var(--white); background: var(--blue); }
 .prompt-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 28px; }
@@ -94,7 +92,7 @@ button,a { -webkit-tap-highlight-color: transparent; }
 .prompt-text { white-space: pre-wrap; font: 500 clamp(20px,2vw,28px)/1.75 DM Mono,Pretendard,monospace; word-break: keep-all; overflow-wrap: anywhere; }
 .prompt-char { color: rgba(255,255,255,.64); }
 .prompt-char--correct { color: var(--white); background: rgba(183,245,0,.25); }
-.prompt-char--wrong { color: #ffe4e7; background: rgba(14,14,14,.24); text-decoration: underline; }
+.prompt-char--wrong { margin: 0 1px; padding: 2px 3px; border-radius: 5px; color: #fff; background: #e52238; box-shadow: 0 2px 0 rgba(114,0,14,.35); text-decoration: none; }
 .prompt-char--composing { color: var(--white); background: rgba(255,255,255,.18); }
 .prompt-char--cursor { color: var(--white); border-left: 2px solid var(--lime); animation: blink .75s steps(1) infinite; }
 @keyframes blink { 50% { opacity:0 } }

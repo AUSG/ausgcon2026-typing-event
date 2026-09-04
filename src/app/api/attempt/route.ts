@@ -11,7 +11,6 @@ export async function POST(request: Request) {
       attemptId?: unknown;
       typedText?: unknown;
       durationMs?: unknown;
-      mistakeCount?: unknown;
     };
     if (
       typeof body.attemptId !== "string" ||
@@ -35,9 +34,9 @@ export async function POST(request: Request) {
     }
 
     const score = calculateScore(attempt.prompt, body.typedText, durationMs);
-    if (body.typedText !== attempt.prompt || score.accuracy !== 100) {
+    if (Array.from(body.typedText).length !== Array.from(attempt.prompt).length) {
       return NextResponse.json(
-        { message: "문장을 정확히 완성한 뒤 제출해주세요." },
+        { message: "문장을 끝까지 입력한 뒤 제출해주세요." },
         { status: 400 },
       );
     }
@@ -45,16 +44,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "측정된 타수를 확인할 수 없어요." }, { status: 400 });
     }
 
-    const mistakeCount = typeof body.mistakeCount === "number"
-      ? Math.max(0, Math.min(Math.round(body.mistakeCount), 500))
-      : 0;
-    const accuracy = Math.round((attempt.prompt.length / (attempt.prompt.length + mistakeCount)) * 1000) / 10;
-
     const completed = await completeAttempt(attempt.id, {
       typed_text: body.typedText,
       duration_ms: durationMs,
       cpm: score.cpm,
-      accuracy,
+      accuracy: score.accuracy,
     });
     if (!completed) {
       return NextResponse.json({ message: "이미 제출된 도전이에요." }, { status: 409 });
