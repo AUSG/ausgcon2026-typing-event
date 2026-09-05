@@ -219,8 +219,8 @@ export function TypingGame() {
         const data = (await response.json()) as Result & { message?: string };
         if (!response.ok) throw new Error(data.message || "기록을 저장하지 못했어요.");
         setResult(data);
-        setPhase("result");
         await fetchLeaderboard(data.nickname);
+        setPhase("result");
       } catch (submitError) {
         submittedRef.current = false;
         setError(submitError instanceof Error ? submitError.message : "기록을 저장하지 못했어요.");
@@ -462,13 +462,20 @@ export function TypingGame() {
           {phase === "result" && result && (
             <div className="result-panel">
               <span className="step-label">CHALLENGE COMPLETE</span>
-              <div className="result-title"><span>{result.nickname}</span><strong>{result.cpm}</strong><b>CPM</b></div>
+              <div className="result-title">
+                <span>{result.nickname}</span>
+                <div className="result-score"><strong>{result.cpm}</strong><b>CPM</b></div>
+                <div className="result-rank">
+                  <b>OVERALL RANK</b>
+                  <strong>{myRank ? `#${myRank.rank}` : "집계 중"}</strong>
+                </div>
+              </div>
               <div className="result-stats">
                 <div><span>ACCURACY</span><strong>{result.accuracy.toFixed(1)}%</strong></div>
                 <div><span>TIME</span><strong>{formatTime(result.durationMs)}</strong></div>
                 <div><span>MISTAKES</span><strong>{mistakeCount}</strong></div>
               </div>
-              <p>기록이 저장되었습니다. 순위 보기에서 오늘의 랭킹을 확인해보세요.</p>
+              <p>기록이 저장되었습니다. 타수와 전체 순위를 함께 확인하세요.</p>
               <div className="result-rule">닉네임당 도전은 한 번만 가능합니다.</div>
               <div className="result-actions">
                 <button className="new-player-button" onClick={startNewPlayer} type="button">새 플레이어 시작 <kbd>ENTER</kbd></button>

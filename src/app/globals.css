@@ -105,10 +105,13 @@ button,a { -webkit-tap-highlight-color: transparent; }
 .typing-footer { display: flex; justify-content: space-between; margin-top: 10px; color: var(--muted); font: 700 8px DM Mono,monospace; letter-spacing: .08em; }
 
 .result-panel { min-height: 500px; padding: 50px clamp(28px,7vw,96px); background: radial-gradient(circle at 82% 38%,rgba(183,245,0,.27),transparent 17rem); }
-.result-title { display: grid; grid-template-columns: 1fr auto auto; align-items: end; gap: 12px; margin: 48px 0 28px; padding-bottom: 24px; border-bottom: 1px solid var(--line); }
+.result-title { display: grid; grid-template-columns: minmax(120px,1fr) auto auto; align-items: end; gap: 24px; margin: 48px 0 28px; padding-bottom: 24px; border-bottom: 1px solid var(--line); }
 .result-title span { align-self: center; font-size: clamp(20px,2vw,30px); font-weight: 700; }
-.result-title strong { color: var(--blue); font-size: clamp(76px,10vw,132px); font-weight: 800; letter-spacing: -.08em; line-height: .7; }
-.result-title b { color: var(--muted); font: 700 13px DM Mono,monospace; }
+.result-score { display:flex; align-items:flex-end; gap:10px; }
+.result-score strong { color: var(--blue); font-size: clamp(76px,10vw,132px); font-weight: 800; letter-spacing: -.08em; line-height: .7; }
+.result-score b,.result-rank b { color: var(--muted); font: 700 10px DM Mono,monospace; letter-spacing:.06em; }
+.result-rank { display:flex; min-width:112px; min-height:100px; flex-direction:column; align-items:center; justify-content:center; gap:8px; border:2px solid var(--ink); border-radius:16px; background:var(--lime); box-shadow:4px 4px 0 var(--ink); }
+.result-rank strong { color:var(--ink); font:800 30px/1 DM Mono,monospace; }
 .result-stats { display: flex; gap: 58px; }
 .result-stats strong { font: 500 20px DM Mono,monospace; }
 .result-panel > p { margin-top: 28px; color: var(--muted); font-size: 12px; }
@@ -185,9 +188,10 @@ button,a { -webkit-tap-highlight-color: transparent; }
   .prompt-text { font-size:17px; line-height:1.75; }
   .typing-footer { gap:10px; line-height:1.5; }
   .result-panel { padding:40px 20px; }
-  .result-title { grid-template-columns:1fr auto; }
-  .result-title strong { font-size:64px; }
-  .result-title b { grid-column:2; }
+  .result-title { grid-template-columns:1fr auto; gap:18px 12px; }
+  .result-title > span { grid-column:1/-1; }
+  .result-score strong { font-size:64px; }
+  .result-rank { min-width:96px; min-height:82px; }
   .rank-table { padding:12px 10px 20px; }
   .rank-row { grid-template-columns:42px minmax(72px,1fr) 74px 52px; font-size:10px; }
 }
