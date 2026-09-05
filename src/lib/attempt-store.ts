@@ -115,3 +115,61 @@ export async function getLeaderboard(limit = 20) {
       completed_at,
     }));
 }
+
+export async function getPlayerRank(nicknameKey: string) {
+  const supabase = getSupabaseAdmin();
+
+  if (supabase) {
+    const { data: player, error } = await supabase
+      .from("typing_attempts")
+      .select("nickname,cpm,accuracy,completed_at")
+      .eq("nickname_key", nicknameKey)
+      .eq("status", "completed")
+      .maybeSingle();
+    if (error) throw error;
+    if (!player || player.cpm === null || player.accuracy === null || !player.completed_at) return null;
+
+    const baseCount = () => supabase
+      .from("typing_attempts")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "completed");
+
+    const [faster, moreAccurate, completedEarlier] = await Promise.all([
+      baseCount().gt("cpm", player.cpm),
+      baseCount().eq("cpm", player.cpm).gt("accuracy", player.accuracy),
+      baseCount()
+        .eq("cpm", player.cpm)
+        .eq("accuracy", player.accuracy)
+        .lt("completed_at", player.completed_at),
+    ]);
+
+    const countError = faster.error ?? moreAccurate.error ?? completedEarlier.error;
+    if (countError) throw countError;
+
+    return {
+      rank: 1 + (faster.count ?? 0) + (moreAccurate.count ?? 0) + (completedEarlier.count ?? 0),
+      nickname: player.nickname,
+      cpm: player.cpm,
+      accuracy: player.accuracy,
+      completed_at: player.completed_at,
+    };
+  }
+
+  const ranked = [...memoryAttempts.values()]
+    .filter((attempt) => attempt.status === "completed")
+    .sort((a, b) =>
+      (b.cpm ?? 0) - (a.cpm ?? 0) ||
+      (b.accuracy ?? 0) - (a.accuracy ?? 0) ||
+      (a.completed_at ?? "").localeCompare(b.completed_at ?? ""),
+    );
+  const index = ranked.findIndex((attempt) => attempt.nickname_key === nicknameKey);
+  if (index < 0) return null;
+  const player = ranked[index];
+  return {
+    rank: index + 1,
+    nickname: player.nickname,
+    cpm: player.cpm ?? 0,
+    accuracy: player.accuracy ?? 0,
+    completed_at: player.completed_at ?? "",
+  };
+}

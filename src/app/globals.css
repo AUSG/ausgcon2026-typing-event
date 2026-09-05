@@ -125,6 +125,12 @@ button,a { -webkit-tap-highlight-color: transparent; }
 .panel-heading .eyebrow { color: var(--ink); }
 .live-indicator { display:flex; align-items:center; gap:7px; font:700 9px DM Mono,monospace; }
 .live-indicator i { background: var(--blue); box-shadow: 0 0 0 4px rgba(37,112,216,.15); }
+.my-rank-card { display:grid; grid-template-columns:110px minmax(120px,1fr) 120px 90px; gap:14px; margin:20px 34px 0; padding:18px 20px; border:2px solid var(--ink); border-radius:16px; background:var(--lime); box-shadow:5px 5px 0 var(--ink); }
+.my-rank-card div { display:flex; flex-direction:column; gap:5px; }
+.my-rank-card span { font:700 8px DM Mono,monospace; letter-spacing:.09em; }
+.my-rank-card strong { overflow:hidden; font-size:17px; text-overflow:ellipsis; white-space:nowrap; }
+.my-rank-card div:first-child strong { color:var(--blue); font:800 28px/1 DM Mono,monospace; }
+.my-rank-card div:nth-child(n+3) { text-align:right; }
 .rank-table { padding: 16px 34px 30px; }
 .rank-row { display:grid; grid-template-columns:62px minmax(100px,1fr) 98px 68px; align-items:center; min-height:54px; border-bottom:1px solid var(--line); font-size:12px; }
 .rank-row--header { min-height:40px; color:var(--muted); font:700 8px DM Mono,monospace; letter-spacing:.08em; }
@@ -163,6 +169,8 @@ button,a { -webkit-tap-highlight-color: transparent; }
   .event-shell { padding:0 10px 18px; }
   .topbar { height:58px; }
   .event-date { font-size:7px; }
+  .my-rank-card { grid-template-columns:1fr 1fr; margin:14px 16px 0; }
+  .my-rank-card div:nth-child(n+3) { text-align:left; }
   .hero-copy { margin:26px auto 18px; }
   .hero-copy h1 { font-size:43px; }
   .game-card,.leaderboard { border-radius:20px; }

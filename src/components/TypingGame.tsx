@@ -47,10 +47,12 @@ function Leaderboard({
   entries,
   loading,
   highlight,
+  mine,
 }: {
   entries: LeaderboardEntry[];
   loading: boolean;
   highlight?: string;
+  mine?: LeaderboardEntry | null;
 }) {
   return (
     <section className="leaderboard" aria-labelledby="leaderboard-title">
@@ -61,6 +63,15 @@ function Leaderboard({
         </div>
         <span className="live-indicator"><i /> LIVE</span>
       </div>
+
+      {mine && (
+        <div className="my-rank-card" aria-label={`내 순위 ${mine.rank}위`}>
+          <div><span>MY RANK</span><strong>#{mine.rank}</strong></div>
+          <div><span>PLAYER</span><strong>{mine.nickname}</strong></div>
+          <div><span>ACCURACY</span><strong>{mine.accuracy.toFixed(1)}%</strong></div>
+          <div><span>CPM</span><strong>{mine.cpm}</strong></div>
+        </div>
+      )}
 
       <div className="rank-table" aria-live="polite">
         <div className="rank-row rank-row--header">
@@ -103,6 +114,7 @@ export function TypingGame() {
   const [error, setError] = useState("");
   const [result, setResult] = useState<Result | null>(null);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [myRank, setMyRank] = useState<LeaderboardEntry | null>(null);
   const [rankingLoading, setRankingLoading] = useState(true);
   const [isStarting, setIsStarting] = useState(false);
   const [hasInputFocus, setHasInputFocus] = useState(false);
@@ -112,15 +124,18 @@ export function TypingGame() {
   const startedAtRef = useRef(0);
   const submittedRef = useRef(false);
 
-  const fetchLeaderboard = useCallback(async () => {
+  const fetchLeaderboard = useCallback(async (playerNickname?: string) => {
     try {
-      const response = await fetch("/api/leaderboard", { cache: "no-store" });
+      const query = playerNickname ? `?nickname=${encodeURIComponent(playerNickname)}` : "";
+      const response = await fetch(`/api/leaderboard${query}`, { cache: "no-store" });
       if (!response.ok) throw new Error();
       const data = (await response.json()) as {
         entries: LeaderboardEntry[];
+        mine: LeaderboardEntry | null;
         storage: "supabase" | "memory";
       };
       setLeaderboard(data.entries);
+      if (playerNickname) setMyRank(data.mine);
       setStorageMode(data.storage);
     } catch {
       // Keep the last good ranking visible during a temporary network failure.
@@ -131,13 +146,13 @@ export function TypingGame() {
 
   useEffect(() => {
     if (view !== "ranking") return;
-    const initialTimer = window.setTimeout(() => void fetchLeaderboard(), 0);
-    const timer = window.setInterval(() => void fetchLeaderboard(), 5_000);
+    const initialTimer = window.setTimeout(() => void fetchLeaderboard(result?.nickname), 0);
+    const timer = window.setInterval(() => void fetchLeaderboard(result?.nickname), 5_000);
     return () => {
       window.clearTimeout(initialTimer);
       window.clearInterval(timer);
     };
-  }, [fetchLeaderboard, view]);
+  }, [fetchLeaderboard, result?.nickname, view]);
 
   useEffect(() => {
     if (phase !== "countdown") return;
@@ -205,7 +220,7 @@ export function TypingGame() {
         if (!response.ok) throw new Error(data.message || "기록을 저장하지 못했어요.");
         setResult(data);
         setPhase("result");
-        await fetchLeaderboard();
+        await fetchLeaderboard(data.nickname);
       } catch (submitError) {
         submittedRef.current = false;
         setError(submitError instanceof Error ? submitError.message : "기록을 저장하지 못했어요.");
@@ -301,6 +316,7 @@ export function TypingGame() {
     setCountdown(COUNTDOWN_SECONDS);
     setError("");
     setResult(null);
+    setMyRank(null);
     setHasInputFocus(false);
     setIsComposing(false);
     setIsStarting(false);
@@ -466,6 +482,7 @@ export function TypingGame() {
           entries={leaderboard}
           highlight={result?.nickname}
           loading={rankingLoading}
+          mine={myRank}
         />
         )}
       </div>
